@@ -1,69 +1,274 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+import { evaluate } from "mathjs";
+
+const Plot = dynamic(() => import("react-plotly.js"), {
+  ssr: false,
+});
 
 export default function Home() {
+
+  useEffect(() => {
+  if (graphType !== "2d") {
+    return;
+  }
+
+  const parts = equation.split("=");
+
+  if (parts.length !== 2) {
+    return;
+  }
+
+  const expression = parts[1].trim();
+
+  create2DGraph(expression);
+}, [amplitude, frequency]);
+
+  const [equation, setEquation] = useState("y = x^2");
+  const [graphType, setGraphType] = useState<"2d" | "3d" | null>(null);
+
+  const [xValues, setXValues] = useState<number[]>([]);
+  const [yValues, setYValues] = useState<number[]>([]);
+
+  const [xGrid, setXGrid] = useState<number[]>([]);
+  const [yGrid, setYGrid] = useState<number[]>([]);
+  const [zGrid, setZGrid] = useState<number[][]>([]);
+
+  const [graphTitle, setGraphTitle] = useState("");
+
+  const [amplitude, setAmplitude] = useState(1);
+  const [frequency, setFrequency] = useState(1);
+
+  function handleVisualize() {
+    try {
+      const parts = equation.split("=");
+
+      if (parts.length !== 2) {
+        alert("Please enter an equation like y = x^2 or z = x^2 + y^2");
+        return;
+      }
+
+      const leftSide = parts[0].trim().toLowerCase();
+      const expression = parts[1].trim();
+
+      if (leftSide === "y") {
+        create2DGraph(expression);
+      } else if (leftSide === "z") {
+        create3DGraph(expression);
+      } else {
+        alert("For now, start the equation with y = or z =");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("I could not understand that equation.");
+    }
+  }
+
+  function create2DGraph(expression: string) {
+    const xs: number[] = [];
+    const ys: number[] = [];
+
+    for (let x = -10; x <= 10; x += 0.1) {
+      const y = evaluate(expression, {
+        x,
+        A: amplitude,
+        k: frequency,
+      });
+
+      if (typeof y === "number" && Number.isFinite(y)) {
+        xs.push(x);
+        ys.push(y);
+      }
+    }
+
+    setXValues(xs);
+    setYValues(ys);
+    setGraphTitle(equation);
+    setGraphType("2d");
+  }
+
+  function create3DGraph(expression: string) {
+    const xs: number[] = [];
+    const ys: number[] = [];
+    const zs: number[][] = [];
+
+    for (let x = -5; x <= 5; x += 0.25) {
+      xs.push(x);
+    }
+
+    for (let y = -5; y <= 5; y += 0.25) {
+      ys.push(y);
+    }
+
+    for (let yIndex = 0; yIndex < ys.length; yIndex++) {
+      const row: number[] = [];
+
+      for (let xIndex = 0; xIndex < xs.length; xIndex++) {
+        const x = xs[xIndex];
+        const y = ys[yIndex];
+
+        const z = evaluate(expression, {
+          x,
+          y,
+          A: amplitude,
+          k: frequency,
+        });
+
+        if (typeof z === "number" && Number.isFinite(z)) {
+          row.push(z);
+        } else {
+          row.push(NaN);
+        }
+      }
+
+      zs.push(row);
+    }
+
+    setXGrid(xs);
+    setYGrid(ys);
+    setZGrid(zs);
+    setGraphTitle(equation);
+    setGraphType("3d");
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <main className="min-h-screen p-8">
+      <div className="max-w-5xl mx-auto">
+        <h1 className="text-5xl font-bold mb-3">Visoran</h1>
+
+        <p className="text-gray-600 mb-8">
+          Turn equations, formulas, and ideas into interactive visualizations.
+        </p>
+
+        <div className="flex flex-col sm:flex-row gap-3 mb-8">
+          <input
+            type="text"
+            value={equation}
+            onChange={(e) => setEquation(e.target.value)}
+            placeholder="Try: y = 2*sin(3*x)"
+            className="flex-1 border border-gray-300 rounded-xl px-4 py-3"
+          />
+
+          <button
+            onClick={handleVisualize}
+            className="bg-black text-white px-6 py-3 rounded-xl"
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+            Visualize
+          </button>
+        </div>
+
+        <div className="mb-8 space-y-5">
+          <div>
+            <label className="block mb-2">
+              Amplitude A: {amplitude}
+            </label>
+
+            <input
+              type="range"
+              min="0.1"
+              max="5"
+              step="0.1"
+              value={amplitude}
+              onChange={(e) => setAmplitude(Number(e.target.value))}
+              className="w-full"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+          </div>
+
+          <div>
+            <label className="block mb-2">
+              Frequency k: {frequency}
+            </label>
+
+            <input
+              type="range"
+              min="0.1"
+              max="5"
+              step="0.1"
+              value={frequency}
+              onChange={(e) => setFrequency(Number(e.target.value))}
+              className="w-full"
+            />
+          </div>
         </div>
-      </main>
-    </div>
+
+        {graphType === "2d" && (
+          <Plot
+            data={[
+              {
+                x: xValues,
+                y: yValues,
+                type: "scatter",
+                mode: "lines",
+                name: graphTitle,
+              },
+            ]}
+            layout={{
+              title: {
+                text: graphTitle,
+              },
+              xaxis: {
+                title: {
+                  text: "x",
+                },
+              },
+              yaxis: {
+                title: {
+                  text: "y",
+                },
+              },
+              autosize: true,
+            }}
+            style={{
+              width: "100%",
+              height: "500px",
+            }}
+            useResizeHandler
+          />
+        )}
+
+        {graphType === "3d" && (
+          <Plot
+            data={[
+              {
+                x: xGrid,
+                y: yGrid,
+                z: zGrid,
+                type: "surface",
+              },
+            ]}
+            layout={{
+              title: {
+                text: graphTitle,
+              },
+              autosize: true,
+              scene: {
+                xaxis: {
+                  title: {
+                    text: "x",
+                  },
+                },
+                yaxis: {
+                  title: {
+                    text: "y",
+                  },
+                },
+                zaxis: {
+                  title: {
+                    text: "z",
+                  },
+                },
+              },
+            }}
+            style={{
+              width: "100%",
+              height: "600px",
+            }}
+            useResizeHandler
+          />
+        )}
+      </div>
+    </main>
   );
 }
